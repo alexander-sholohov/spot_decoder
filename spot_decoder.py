@@ -60,7 +60,7 @@ def utc_time_minute_rounded():
     return x - discard
 
 #--------------------------------------------
-def doPOST(url, mode, src, lArr, rArr):
+def doPOST(url, mode, src, magicKey, lArr, rArr):
     if not url:
         return
         
@@ -71,6 +71,7 @@ def doPOST(url, mode, src, lArr, rArr):
     rec['dt_shift'] = lArr[2]
     rec['freq'] = lArr[3]
     rec['src'] = src
+    rec['magic_key'] = magicKey
     rec['message'] = " ".join(rArr)
 
     params = urllib.urlencode(rec)
@@ -123,7 +124,7 @@ def decoder_proc(waveName, outName):
             for line in StringIO.StringIO(outdata):
                 lArr, rArr = split_params(line)
                 if rArr:
-                    doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, mode, lArr, rArr)
+                    doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIG_KEY, mode, lArr, rArr)
 
         else:
             print "No data present. Skip saving result."

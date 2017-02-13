@@ -48,4 +48,7 @@ DECODER_CHAIN.append( ['jt65b', [JT65_CMD, '-m', 'B']  ] )
 
 WORKING_DIR = 'TMPFILES'
 KEEP_DECODED_RESULT = False
+
 SRC = 'BRN'
+POST_MAGIG_KEY = 'secret'
+
