@@ -124,7 +124,7 @@ def decoder_proc(waveName, outName):
             for line in StringIO.StringIO(outdata):
                 lArr, rArr = split_params(line)
                 if rArr:
-                    doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIG_KEY, mode, lArr, rArr)
+                    doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIC_KEY, mode, lArr, rArr)
 
         else:
             print "No data present. Skip saving result."
