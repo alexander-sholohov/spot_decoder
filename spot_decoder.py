@@ -60,7 +60,7 @@ def utc_time_minute_rounded():
     return x - discard
 
 #--------------------------------------------
-def doPOST(url, mode, src, magicKey, lArr, rArr):
+def doPOST(url, src, magicKey, mode, lArr, rArr):
     if not url:
         return
         
