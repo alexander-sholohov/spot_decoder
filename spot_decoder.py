@@ -60,19 +60,19 @@ def utc_time_minute_rounded():
     return x - discard
 
 #--------------------------------------------
-def doPOST(url, src, magicKey, mode, lArr, rArr):
+def doPOST(url, src, magicKey, mode, utcTime, dbRatio, dtShift, freq, message):
     if not url:
         return
         
     rec = {}
     rec['mode'] = mode
-    rec['utc_time'] = lArr[0]
-    rec['db_ratio'] = lArr[1]
-    rec['dt_shift'] = lArr[2]
-    rec['freq'] = lArr[3]
+    rec['utc_time'] = utcTime
+    rec['db_ratio'] = dbRatio
+    rec['dt_shift'] = dtShift
+    rec['freq'] = freq
     rec['src'] = src
     rec['magic_key'] = magicKey
-    rec['message'] = " ".join(rArr)
+    rec['message'] = message
 
     params = urllib.urlencode(rec)
     headers = {"Content-type": "application/x-www-form-urlencoded",
@@ -91,7 +91,7 @@ def doPOST(url, src, magicKey, mode, lArr, rArr):
 
 
 #--------------------------------------------
-def decoder_proc(waveName, outName):
+def decoder_proc(waveName, utcShortTime, outFormattedName):
     decodeStartedStamp = datetime.datetime.now()
     print "Decoding {0}...".format(waveName)
 
@@ -116,7 +116,7 @@ def decoder_proc(waveName, outName):
 
         if needProcess:
             if cfg.KEEP_DECODED_RESULT:
-                with open(outName, "w") as fv:
+                with open(outFormattedName.format(mode), "w") as fv:
                     fv.write(outdata)
 
             print "Will publish to {0}".format(cfg.HTTP_SPOT_URI)
@@ -124,8 +124,15 @@ def decoder_proc(waveName, outName):
             for line in StringIO.StringIO(outdata):
                 lArr, rArr = split_params(line)
                 if rArr:
-                    doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIC_KEY, mode, lArr, rArr)
-
+                    if len(lArr) == 4:
+                        utcTime, dbRatio, dtShift, freq = lArr
+                    elif len(lArr) == 3:
+                        dbRatio, dtShift, freq = lArr
+                        utcTime = utcShortTime
+                    else:
+                        raise Exception("Unknown left side of params")
+                    message = " ".join(rArr)
+                    doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIC_KEY, mode, utcTime, dbRatio, dtShift, freq, message)
         else:
             print "No data present. Skip saving result."
 
@@ -177,10 +184,11 @@ def main():
             dirName = cfg.WORKING_DIR
         if not os.path.exists(dirName):
             os.makedirs(dirName)
-        baseName =  "{0}/{1}_{2}".format( dirName, dStart.strftime("%Y%m%d%H%M%S"), utcTime.strftime("%H%M") )
+        utcShortTime = utcTime.strftime("%H%M")
+        baseName =  "{0}/{1}_{2}".format(dirName, dStart.strftime("%Y%m%d%H%M%S"), utcShortTime)
         rawName = baseName + ".raw"
         waveName = baseName + ".wav"
-        outName = baseName + ".txt"
+        outFormattedBaseName = baseName + "-{0}.txt"
 
 
         fv = open(rawName, "wb")
@@ -232,7 +240,7 @@ def main():
         os.remove(rawName) # delete raw file
 
 
-        t1 = threading.Thread(target=decoder_proc, args=(waveName, outName))
+        t1 = threading.Thread(target=decoder_proc, args=(waveName, utcShortTime, outFormattedBaseName))
         t1.start()
 
 
