@@ -8,6 +8,7 @@
 
 import sys
 import os
+import re
 import subprocess
 import signal
 import time
@@ -28,6 +29,15 @@ def split_params(line):
     lArr = line[:pos].split()
     rArr = line[pos+1:].split()
     return (lArr, rArr)
+
+#--------------------------------------------
+def num_result_lines(data):
+    res = 0
+    for line in StringIO.StringIO(data):
+        lArr, rArr = split_params(line)
+        if rArr:
+            res += 1
+    return res
 
 #--------------------------------------------
 def is_seconds_in_range(d, timeFrame):
@@ -89,16 +99,31 @@ def doPOST(url, src, magicKey, mode, utcTime, dbRatio, dtShift, freq, message):
     conn.close()
 
 
+#--------------------------------------------
+def is_callsign(s):
+    m = re.search('^[A-Z]{1,2}[0-9][A-Z]{1,3}$', s)
+    return m != None
+
+#--------------------------------------------
+def is_valid_callsign_in_array(arr):
+    for s in arr:
+        if not is_callsign(s):
+            continue
+
+        for elm in cfg.CALLSIGN_PREFIXES:
+            if s.startswith(elm):
+                return True
+    return False
 
 #--------------------------------------------
 def decoder_proc(waveName, utcShortTime, outFormattedName):
     decodeStartedStamp = datetime.datetime.now()
     print "Decoding {0}...".format(waveName)
 
-    needSaveFlac = False
+    prepareToSend = []
 
-    for mode, cmdLine in cfg.DECODER_CHAIN:
-        print "Process mode: ", mode
+    for mode, isFilterNeeded, cmdLine in cfg.DECODER_CHAIN:
+        print "Process mode: ", mode, isFilterNeeded
         fullCmdLine = cmdLine + [waveName]
         p = subprocess.Popen(fullCmdLine, shell=False, stdout=subprocess.PIPE)
 
@@ -107,19 +132,12 @@ def decoder_proc(waveName, utcShortTime, outFormattedName):
             print "errdata=", errdata
         print "OutData=", outdata
 
-        needProcess = False
-        for line in StringIO.StringIO(outdata):
-            lArr, rArr = split_params(line)
-            if rArr:
-                needProcess = True
-                needSaveFlac = True
+        if num_result_lines(outdata):
 
-        if needProcess:
             if cfg.KEEP_DECODED_RESULT:
-                with open(outFormattedName.format(mode), "w") as fv:
+                suffix = "{0}{1}".format(mode, "1" if isFilterNeeded else "0")
+                with open(outFormattedName.format(suffix), "w") as fv:
                     fv.write(outdata)
-
-            print "Will publish to {0}".format(cfg.HTTP_SPOT_URI)
             
             for line in StringIO.StringIO(outdata):
                 lArr, rArr = split_params(line)
@@ -131,13 +149,25 @@ def decoder_proc(waveName, utcShortTime, outFormattedName):
                         utcTime = utcShortTime
                     else:
                         raise Exception("Unknown left side of params")
-                    message = " ".join(rArr)
-                    doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIC_KEY, mode, utcTime, dbRatio, dtShift, freq, message)
+
+                    if not isFilterNeeded or is_valid_callsign_in_array(rArr):
+                        message = " ".join(rArr)
+                        itemToSend = (mode, utcTime, dbRatio, dtShift, freq, message)
+                        prepareToSend.append(itemToSend)
         else:
             print "No data present. Skip saving result."
 
+    # remove duplicates
+    newPrepareToSend = [elm for n,elm in enumerate(prepareToSend) if elm not in prepareToSend[:n]]
 
-    if needSaveFlac and cfg.KEEP_DECODED_RESULT:
+    # post
+    for item in newPrepareToSend:
+        print "Publish to {0}; item={1}".format(cfg.HTTP_SPOT_URI, item)
+        mode, utcTime, dbRatio, dtShift, freq, message = item
+        doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIC_KEY, mode, utcTime, dbRatio, dtShift, freq, message)
+
+    # save flac
+    if len(newPrepareToSend)>0 and cfg.KEEP_DECODED_RESULT:
         # compress
         print "Compress flac..."
         p = subprocess.Popen([cfg.FLAC_CMD, waveName], shell=False, stdout=subprocess.PIPE)

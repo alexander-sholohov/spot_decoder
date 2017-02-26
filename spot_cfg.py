@@ -40,8 +40,13 @@ for item in CMD_CHAIN:
 
 
 DECODER_CHAIN = []
-DECODER_CHAIN.append( ['jt65a', [JT65_CMD, '-m', 'A']  ] )
-DECODER_CHAIN.append( ['jt65b', [JT65_CMD, '-m', 'B']  ] )
+DECODER_CHAIN.append( ['jt65a', False, [JT65_CMD, '-a', '1', '-m', 'A']  ] )
+DECODER_CHAIN.append( ['jt65a', True,  [JT65_CMD, '-a', '0', '-m', 'A']  ] )
+DECODER_CHAIN.append( ['jt65b', False, [JT65_CMD, '-a', '1', '-m', 'B']  ] )
+DECODER_CHAIN.append( ['jt65b', True,  [JT65_CMD, '-a', '0', '-m', 'B']  ] )
+
+
+CALLSIGN_PREFIXES = ["R9", "RA9", "UB9", "UB0", "RV9", "RZ9", "RK9", "R0", "RA0", "UA9", "RU9", "RT9", "RT0", "RW9", "RW0", "UN7"]
 
 # WORKING_DIR = lambda x: x.strftime("%Y_%m_%d")
 # KEEP_DECODED_RESULT = True
