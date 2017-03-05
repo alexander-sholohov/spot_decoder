@@ -15,3 +15,4 @@ Done. Please find jt65 at current directory.
 
 Prerequirements:  
 sudo apt-get install libfftw3-dev 
+gcc 4.8.4 or later
