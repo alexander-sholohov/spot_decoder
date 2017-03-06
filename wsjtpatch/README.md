@@ -1,10 +1,10 @@
-How to compile console uility jt65:
+How to compile console decoder jt65:
 
 ```
-git clone https://github.com/alexander-sholohov/spot_decoder
 svn co -r 7579 svn://svn.code.sf.net/p/wsjt/wsjt/branches/wsjtx
 cd wsjtx
-svn patch ../spot_decoder/wsjtpatch/spot-wsjtx-r7579.patch 
+wget https://github.com/alexander-sholohov/spot_decoder/raw/master/wsjtpatch/spot-wsjtx-r7579.patch
+svn patch spot-wsjtx-r7579.patch
 mkdir build
 cd build
 cmake -DWSJT_SKIP_MANPAGES=ON -DWSJT_GENERATE_DOCS=OFF ..
