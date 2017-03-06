@@ -109,7 +109,7 @@ Index: CMakeLists.txt
  
  add_executable (jt4sim lib/jt4sim.f90 wsjtx.rc)
  target_link_libraries (jt4sim wsjt_fort wsjt_cxx)
-@@ -1061,8 +1061,7 @@
+@@ -1061,15 +1061,15 @@
  add_executable (jt9code lib/jt9code.f90 wsjtx.rc)
  target_link_libraries (jt9code wsjt_fort wsjt_cxx)
  
@@ -119,23 +119,73 @@ Index: CMakeLists.txt
  target_link_libraries (wsprcode wsjt_fort wsjt_cxx)
  
  add_executable (wsprd ${wsprd_CSRCS})
-@@ -1092,11 +1091,11 @@
- add_executable (msk144d2 lib/msk144d2.f90 wsjtx.rc)
- target_link_libraries (msk144d2 wsjt_fort wsjt_cxx)
+ target_include_directories (wsprd PRIVATE ${FFTW3_INCLUDE_DIRS})
+-target_link_libraries (wsprd ${FFTW3_LIBRARIES})
++target_link_libraries (wsprd -lm ${FFTW3_LIBRARIES})
  
--add_executable (fmtave lib/fmtave.f90 wsjtx.rc)
-+#add_executable (fmtave lib/fmtave.f90 wsjtx.rc)
+ add_executable (wsprsim ${wsprsim_CSRCS})
++target_link_libraries (wsprsim -lm)
  
--add_executable (fcal lib/fcal.f90 wsjtx.rc)
-+#add_executable (fcal lib/fcal.f90 wsjtx.rc)
+ add_executable (jt4code lib/jt4code.f90 wsjtx.rc)
+ target_link_libraries (jt4code wsjt_fort wsjt_cxx)
+@@ -1098,111 +1098,111 @@
  
--add_executable (fmeasure lib/fmeasure.f90 wsjtx.rc)
-+#add_executable (fmeasure lib/fmeasure.f90 wsjtx.rc)
+ add_executable (fmeasure lib/fmeasure.f90 wsjtx.rc)
  
- add_executable (jt9 ${jt9_FSRCS} ${jt9_CXXSRCS} wsjtx.rc)
- if (${OPENMP_FOUND} OR APPLE)
-@@ -1127,39 +1126,39 @@
- endif (${OPENMP_FOUND} OR APPLE)
+-add_executable (jt9 ${jt9_FSRCS} ${jt9_CXXSRCS} wsjtx.rc)
+-if (${OPENMP_FOUND} OR APPLE)
+-  if (APPLE)
+-    # On  Mac  we don't  have  working  OpenMP  support in  the  C/C++
+-    # compilers so we  have to manually set the  correct linking flags
+-    # and libraries to get OpenMP support in jt9.
+-    set_target_properties (jt9
+-      PROPERTIES
+-      Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
+-      LINK_LIBRARIES "gomp;gcc_s.1" # assume GNU libgcc OpenMP
+-      )
+-    target_compile_options (jt9
+-      PRIVATE
+-      $<$<COMPILE_LANGUAGE:Fortran>:-fopenmp>   # assumes GNU style Fortran compiler
+-      )
+-  else (APPLE)
+-    set_target_properties (jt9
+-      PROPERTIES
+-      COMPILE_FLAGS "${OpenMP_C_FLAGS}"
+-      LINK_FLAGS "${OpenMP_C_FLAGS}"
+-      Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
+-      )
+-  endif (APPLE)
+-  target_link_libraries (jt9 wsjt_fort_omp wsjt_cxx Qt5::Core)
+-else (${OPENMP_FOUND} OR APPLE)
+-  target_link_libraries (jt9 wsjt_fort wsjt_cxx Qt5::Core)
+-endif (${OPENMP_FOUND} OR APPLE)
++#add_executable (jt9 ${jt9_FSRCS} ${jt9_CXXSRCS} wsjtx.rc)
++#if (${OPENMP_FOUND} OR APPLE)
++#  if (APPLE)
++#    # On  Mac  we don't  have  working  OpenMP  support in  the  C/C++
++#    # compilers so we  have to manually set the  correct linking flags
++#    # and libraries to get OpenMP support in jt9.
++#    set_target_properties (jt9
++#      PROPERTIES
++#      Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
++#      LINK_LIBRARIES "gomp;gcc_s.1" # assume GNU libgcc OpenMP
++#      )
++#    target_compile_options (jt9
++#      PRIVATE
++#      $<$<COMPILE_LANGUAGE:Fortran>:-fopenmp>   # assumes GNU style Fortran compiler
++#      )
++#  else (APPLE)
++#    set_target_properties (jt9
++#      PROPERTIES
++#      COMPILE_FLAGS "${OpenMP_C_FLAGS}"
++#      LINK_FLAGS "${OpenMP_C_FLAGS}"
++#      Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
++#      )
++#  endif (APPLE)
++#  target_link_libraries (jt9 wsjt_fort_omp wsjt_cxx Qt5::Core)
++#else (${OPENMP_FOUND} OR APPLE)
++#  target_link_libraries (jt9 wsjt_fort wsjt_cxx Qt5::Core)
++#endif (${OPENMP_FOUND} OR APPLE)
  
  # build the main application
 -add_executable (wsjtx MACOSX_BUNDLE
@@ -179,37 +229,67 @@ Index: CMakeLists.txt
 +#  )
  
 -target_include_directories (wsjtx PRIVATE ${FFTW3_INCLUDE_DIRS})
-+#target_include_directories (wsjtx PRIVATE ${FFTW3_INCLUDE_DIRS})
- if (APPLE)
-   target_link_libraries (wsjtx wsjt_fort wsjt_cxx wsjt_qt wsjt_qtmm ${hamlib_LIBRARIES} ${FFTW3_LIBRARIES})
- else ()
+-if (APPLE)
+-  target_link_libraries (wsjtx wsjt_fort wsjt_cxx wsjt_qt wsjt_qtmm ${hamlib_LIBRARIES} ${FFTW3_LIBRARIES})
+-else ()
 -  target_link_libraries (wsjtx wsjt_fort_omp wsjt_cxx wsjt_qt wsjt_qtmm ${hamlib_LIBRARIES} ${FFTW3_LIBRARIES})
 -  set_target_properties (wsjtx PROPERTIES
 -    COMPILE_FLAGS "${OpenMP_C_FLAGS}"
 -    LINK_FLAGS "${OpenMP_C_FLAGS}"
 -    Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
 -    )
+-  if (WIN32)
+-    set_target_properties (wsjtx PROPERTIES
+-      LINK_FLAGS -Wl,--stack,16777216
+-      )
+-  endif ()
+-endif ()
+-qt5_use_modules (wsjtx SerialPort) # not sure why the interface link library syntax above doesn't work
++#target_include_directories (wsjtx PRIVATE ${FFTW3_INCLUDE_DIRS})
++#if (APPLE)
++#  target_link_libraries (wsjtx wsjt_fort wsjt_cxx wsjt_qt wsjt_qtmm ${hamlib_LIBRARIES} ${FFTW3_LIBRARIES})
++#else ()
 +#  target_link_libraries (wsjtx wsjt_fort_omp wsjt_cxx wsjt_qt wsjt_qtmm ${hamlib_LIBRARIES} ${FFTW3_LIBRARIES})
 +#  set_target_properties (wsjtx PROPERTIES
 +#    COMPILE_FLAGS "${OpenMP_C_FLAGS}"
 +#    LINK_FLAGS "${OpenMP_C_FLAGS}"
 +#    Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
 +#    )
-   if (WIN32)
-     set_target_properties (wsjtx PROPERTIES
-       LINK_FLAGS -Wl,--stack,16777216
-@@ -1166,7 +1165,7 @@
-       )
-   endif ()
- endif ()
--qt5_use_modules (wsjtx SerialPort) # not sure why the interface link library syntax above doesn't work
++#  if (WIN32)
++#    set_target_properties (wsjtx PROPERTIES
++#      LINK_FLAGS -Wl,--stack,16777216
++#      )
++#  endif ()
++#endif ()
 +#qt5_use_modules (wsjtx SerialPort) # not sure why the interface link library syntax above doesn't work
  
  # make a library for WSJT-X UDP servers
  # add_library (wsjtx_udp SHARED ${UDP_library_CXXSRCS})
-@@ -1187,22 +1186,22 @@
-   )
- target_compile_definitions (wsjtx_udp-static PUBLIC UDP_STATIC_DEFINE)
+-add_library (wsjtx_udp-static STATIC ${UDP_library_CXXSRCS})
++#add_library (wsjtx_udp-static STATIC ${UDP_library_CXXSRCS})
+ #target_include_directories (wsjtx_udp
+ #  INTERFACE
+ #  $<INSTALL_INTERFACE:${WSJT_INCLUDE_DESTINATION}/wsjtx>
+ #  )
+-target_include_directories (wsjtx_udp-static
+-  INTERFACE
+-  $<INSTALL_INTERFACE:${WSJT_INCLUDE_DESTINATION}/wsjtx>
+-  )
++#target_include_directories (wsjtx_udp-static
++#  INTERFACE
++#  $<INSTALL_INTERFACE:${WSJT_INCLUDE_DESTINATION}/wsjtx>
++#  )
+ #set_target_properties (wsjtx_udp PROPERTIES
+ #  PUBLIC_HEADER "${UDP_library_HEADERS}"
+ #  )
+-set_target_properties (wsjtx_udp-static PROPERTIES
+-  OUTPUT_NAME wsjtx_udp
+-  )
+-target_compile_definitions (wsjtx_udp-static PUBLIC UDP_STATIC_DEFINE)
++#set_target_properties (wsjtx_udp-static PROPERTIES
++#  OUTPUT_NAME wsjtx_udp
++#  )
++#target_compile_definitions (wsjtx_udp-static PUBLIC UDP_STATIC_DEFINE)
  #qt5_use_modules (wsjtx_udp Network)
 -qt5_use_modules (wsjtx_udp-static Network)
 -generate_export_header (wsjtx_udp-static BASE_NAME udp)
@@ -244,7 +324,7 @@ Index: CMakeLists.txt
  
  if (WSJT_CREATE_WINMAIN)
    set_target_properties (message_aggregator PROPERTIES WIN32_EXECUTABLE ON)
-@@ -1215,7 +1214,7 @@
+@@ -1215,7 +1215,7 @@
    endif (NOT WSJT_SKIP_MANPAGES)
    if (NOT APPLE)
      add_subdirectory (debian)
@@ -253,7 +333,7 @@ Index: CMakeLists.txt
    endif (NOT APPLE)
  endif (UNIX)
  
-@@ -1222,10 +1221,10 @@
+@@ -1222,10 +1222,10 @@
  #
  # installation
  #
@@ -268,7 +348,7 @@ Index: CMakeLists.txt
  
  # install (TARGETS wsjtx_udp EXPORT udp
  #   RUNTIME DESTINATION ${WSJT_BIN_DESTINATION}
-@@ -1244,48 +1243,48 @@
+@@ -1244,48 +1244,48 @@
  #   DESTINATION ${WSJT_LIB_DESTINATION}/cmake/wsjtx
  #   )
  
@@ -354,7 +434,7 @@ Index: CMakeLists.txt
  
  #
  # Mac installer files
-@@ -1320,7 +1319,7 @@
+@@ -1320,7 +1320,7 @@
  # explicitly say that the wsjt_qt depends on custom target, this is
  # done indirectly so that the revisiontag target gets built exactly
  # once per build
@@ -363,7 +443,7 @@ Index: CMakeLists.txt
  
  
  #
-@@ -1353,8 +1352,8 @@
+@@ -1353,8 +1353,8 @@
  #
  if (NOT is_debug_build)
  
