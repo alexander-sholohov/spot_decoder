@@ -1,16 +1,18 @@
 
 CSDR_CMD = 'csdr'
-JT65_CMD = 'jt65'
+MSK144_CMD = './msk144d2'
 FLAC_CMD = 'flac'
 
-HTTP_SPOT_URI = 'http://192.168.1.200:9000/spotter/default/populate_spot'
+# HTTP_SPOT_URI = 'http://192.168.1.200:9000/spotter/default/populate_spot'
+HTTP_SPOT_URI = None
 
-START_INTERVAL_IN_SECONDS = 60
+
+START_INTERVAL_IN_SECONDS = 15
 LEAD_START_IN_SECONDS = 0.5
-RECORD_DURATION_IN_SECONDS = 55
+RECORD_DURATION_IN_SECONDS = 14
 
 rfSampRate = 2048000
-shift = str(float(145000000-144176200)/rfSampRate)
+shift = str(float(145000000-144360000)/rfSampRate)
 stage1SampRate = 32000
 AUDIO_SAMPLE_RATE = 12000
 decimation = str(2048000.0 / stage1SampRate)
@@ -37,20 +39,17 @@ for item in CMD_CHAIN:
 
 
 DECODER_CHAIN = []
-DECODER_CHAIN.append( ['jt65a', False, [JT65_CMD, '-a', '1', '-n', '1000', '-m', 'A']  ] )
-DECODER_CHAIN.append( ['jt65a', True,  [JT65_CMD, '-n', '9000', '-m', 'A']  ] )
-# DECODER_CHAIN.append( ['jt65b', False, [JT65_CMD, '-a', '1', '-n', '1000', '-m', 'B']  ] )
-# DECODER_CHAIN.append( ['jt65b', True,  [JT65_CMD, '-n', '9000', '-m', 'B']  ] )
-DECODER_CHAIN.append( ['qra64a', False,  [JT65_CMD, '-m', '1']  ] )
+DECODER_CHAIN.append( ['msk144', False, [MSK144_CMD, '-f', '1500'] ] )
 
 CALLSIGN_PREFIXES = ["R9", "RA9", "UB9", "UB0", "RV9", "RZ9", "RK9", "R0",
                 "RA0", "UA9", "RU9", "RT9", "RT0", "RW9", "RW0", "UN7",
                 "RC9", "RO9", "RG8", "RG9"]
 
 
-WORKING_DIR = lambda x: x.strftime("tmp/%Y_%m_%d")
-BASE_FILE_NAME = lambda d,local_time,utc_time: "{0}/{1}_{2}".format(d, local_time.strftime("%Y%m%d%H%M%S"), utc_time.strftime("%H%M"))
+WORKING_DIR = lambda x: x.strftime("tmp_msk144/%Y_%m_%d")
+BASE_FILE_NAME = lambda d,local_time,utc_time: "{0}/{1}_{2}".format(d, local_time.strftime("%Y%m%d%H%M%S"), utc_time.strftime("%H%M%S"))
 KEEP_DECODED_RESULT = True
+KEEP_WAV_FILES = False
 
 # WORKING_DIR = 'TMPFILES'
 # KEEP_DECODED_RESULT = False

@@ -24,6 +24,8 @@ from inspect import isfunction
 def split_params(line):
     pos = line.find("#")
     if pos == -1:
+        pos = line.find("&")
+    if pos == -1:
         return (None, None)
 
     lArr = line[:pos].split()
@@ -40,33 +42,9 @@ def num_result_lines(data):
     return res
 
 #--------------------------------------------
-def is_seconds_in_range(d, timeFrame):
-    (sFrom, sTo) = timeFrame
-    x = d.second + d.microsecond / 1000000.0
-    if (sFrom <= x) and (x <= sTo):
-        return True
-    x += 60.0
-    if (sFrom <= x) and (x <= sTo):
-        return True
-
-    return False
-
-#--------------------------------------------
-def seconds_before_range(d, timeFrame):
-    (sFrom, sTo) = timeFrame
-    x = d.second + d.microsecond / 1000000.0
-    return (sFrom - x) if x < sFrom else (sFrom + 60 - x)
-
-#--------------------------------------------
-def is_even_minute(d):
-    shift = datetime.timedelta(seconds=cfg.ROUND_TO_MINUTE_IN_SECONDS)
-    d2 = d + shift
-    return d2.minute % 2 == 0
-
-#--------------------------------------------
-def utc_time_minute_rounded():
-    x = datetime.datetime.utcnow() + datetime.timedelta(seconds=cfg.ROUND_TO_MINUTE_IN_SECONDS)
-    discard = datetime.timedelta(seconds=x.second,  microseconds=x.microsecond)
+def utc_time_15s_rounded():
+    x = datetime.datetime.utcnow() + datetime.timedelta(seconds=5)
+    discard = datetime.timedelta(seconds=(x.second % 15),  microseconds=x.microsecond)
     return x - discard
 
 #--------------------------------------------
@@ -116,8 +94,12 @@ def is_valid_callsign_in_array(arr):
     return False
 
 #--------------------------------------------
-def decoder_proc(waveName, utcShortTime, outFormattedName):
+def decoder_proc(waveName, utcTime, outFormattedName):
     decodeStartedStamp = datetime.datetime.now()
+    if not os.path.isfile(waveName):
+        print 'File {} not exist'.format(waveName)
+        return
+        # raise Exception('File {} not exist'.format(waveName))
     print "Decoding {0}...".format(waveName)
 
     prepareToSend = []
@@ -125,6 +107,7 @@ def decoder_proc(waveName, utcShortTime, outFormattedName):
     for mode, isFilterNeeded, cmdLine in cfg.DECODER_CHAIN:
         print "Process mode: ", mode, isFilterNeeded
         fullCmdLine = cmdLine + [waveName]
+        print "fullCmdLine=", fullCmdLine
         p = subprocess.Popen(fullCmdLine, shell=False, stdout=subprocess.PIPE)
 
         outdata, errdata = p.communicate()
@@ -143,16 +126,16 @@ def decoder_proc(waveName, utcShortTime, outFormattedName):
                 lArr, rArr = split_params(line)
                 if rArr:
                     if len(lArr) == 4:
-                        utcTime, dbRatio, dtShift, freq = lArr
+                        utcPrintableTime, dbRatio, dtShift, freq = lArr
                     elif len(lArr) == 3:
                         dbRatio, dtShift, freq = lArr
-                        utcTime = utcShortTime
+                        utcPrintableTime = utcTime.strftime("%H%M%S")
                     else:
                         raise Exception("Unknown left side of params")
 
                     if not isFilterNeeded or is_valid_callsign_in_array(rArr):
                         message = " ".join(rArr)
-                        itemToSend = (mode, utcTime, dbRatio, dtShift, freq, message)
+                        itemToSend = (mode, utcPrintableTime, dbRatio, dtShift, freq, message)
                         prepareToSend.append(itemToSend)
         else:
             print "No data present. Skip saving result."
@@ -163,8 +146,8 @@ def decoder_proc(waveName, utcShortTime, outFormattedName):
     # post
     for item in newPrepareToSend:
         print "Publish to {0}; item={1}".format(cfg.HTTP_SPOT_URI, item)
-        mode, utcTime, dbRatio, dtShift, freq, message = item
-        doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIC_KEY, mode, utcTime, dbRatio, dtShift, freq, message)
+        mode, utcPrintableTime, dbRatio, dtShift, freq, message = item
+        doPOST(cfg.HTTP_SPOT_URI, cfg.SRC, cfg.POST_MAGIC_KEY, mode, utcPrintableTime, dbRatio, dtShift, freq, message)
 
     # save flac
     if len(newPrepareToSend)>0 and cfg.KEEP_DECODED_RESULT:
@@ -174,7 +157,11 @@ def decoder_proc(waveName, utcShortTime, outFormattedName):
         p.communicate()
 
     # delete original wav file
-    os.remove(waveName)
+    if hasattr(cfg, "KEEP_WAV_FILES") and cfg.KEEP_WAV_FILES:
+        print "Keep wav file"
+    else:
+        print "Remove wav file"
+        os.remove(waveName)
 
     decodeEndedStamp = datetime.datetime.now()
 
@@ -193,37 +180,31 @@ def main():
         while True:
             dStart = datetime.datetime.now()
             
-            isOtherCondtionsOk = (not cfg.START_ONLY_AT_EVEN_MINUTE or is_even_minute(dStart))
-            if isOtherCondtionsOk and is_seconds_in_range(dStart, cfg.START_WINDOW):
+            s = int(dStart.minute * 60.0 + dStart.second + dStart.microsecond / 1000000.0 + cfg.LEAD_START_IN_SECONDS)
+            if s % int(cfg.START_INTERVAL_IN_SECONDS) == 0:
                 break
 
-            if isOtherCondtionsOk and seconds_before_range(dStart, cfg.START_WINDOW) < 2.0:
-                time.sleep(0.1)
-            else:
-                if cnt % 5 == 0:
-                    print "second=", dStart.second
-                time.sleep(1)
-                cnt += 1
+            time.sleep(0.1)
+            cnt += 1
+            if cnt % 50 == 0:
+                print "second=", dStart.second
 
         print "Started at {0}".format( str(dStart) )
 
-        utcTime = utc_time_minute_rounded()
+        utcTime = utc_time_15s_rounded()
         if isfunction(cfg.WORKING_DIR):
             dirName = cfg.WORKING_DIR(utcTime)
         else:
             dirName = cfg.WORKING_DIR
         if not os.path.exists(dirName):
             os.makedirs(dirName)
-        utcShortTime = utcTime.strftime("%H%M")
-        baseName =  "{0}/{1}_{2}".format(dirName, dStart.strftime("%Y%m%d%H%M%S"), utcShortTime)
+        baseName = cfg.BASE_FILE_NAME(dirName, dStart, utcTime)
         rawName = baseName + ".raw"
         waveName = baseName + ".wav"
         outFormattedBaseName = baseName + "-{0}.txt"
 
-
         fv = open(rawName, "wb")
         print "Start write to {0}".format(rawName)
-
 
         cn = []
         for item in cfg.CMD_CHAIN:
@@ -244,9 +225,9 @@ def main():
             diff = dCurr - dStart
             if diff.total_seconds() > cfg.RECORD_DURATION_IN_SECONDS:
                 break
-            if cnt % 10 == 0:
-                print "seconds elapsed =", diff.total_seconds()
-            time.sleep(0.8)
+            if cnt % 20 == 0:
+                print "seconds writed =", diff.total_seconds()
+            time.sleep(0.25)
             cnt += 1
 
         print "Terminating..."
@@ -268,11 +249,10 @@ def main():
             w.close()
 
         os.remove(rawName) # delete raw file
+        print "waveName=", waveName
 
-
-        t1 = threading.Thread(target=decoder_proc, args=(waveName, utcShortTime, outFormattedBaseName))
+        t1 = threading.Thread(target=decoder_proc, args=(waveName, utcTime, outFormattedBaseName))
         t1.start()
-
 
 
 #--------------------------------------------
