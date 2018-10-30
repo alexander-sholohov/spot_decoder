@@ -20,26 +20,6 @@ import httplib, urllib
 import urlparse
 from inspect import isfunction
 
-#--------------------------------------------
-def split_params(line):
-    pos = line.find("#")
-    if pos == -1:
-        pos = line.find("&")
-    if pos == -1:
-        return (None, None)
-
-    lArr = line[:pos].split()
-    rArr = line[pos+1:].split()
-    return (lArr, rArr)
-
-#--------------------------------------------
-def num_result_lines(data):
-    res = 0
-    for line in StringIO.StringIO(data):
-        lArr, rArr = split_params(line)
-        if rArr:
-            res += 1
-    return res
 
 #--------------------------------------------
 def utc_time_15s_rounded():
@@ -94,7 +74,7 @@ def is_valid_callsign_in_array(arr):
     return False
 
 #--------------------------------------------
-def decoder_proc(waveName, utcTime, outFormattedName):
+def decoder_proc(waveName, utcTime, outBaseName):
     decodeStartedStamp = datetime.datetime.now()
     if not os.path.isfile(waveName):
         print 'File {} not exist'.format(waveName)
@@ -102,9 +82,11 @@ def decoder_proc(waveName, utcTime, outFormattedName):
         # raise Exception('File {} not exist'.format(waveName))
     print "Decoding {0}...".format(waveName)
 
+    occupiedFileNames = {}
+
     prepareToSend = []
 
-    for mode, isFilterNeeded, cmdLine in cfg.DECODER_CHAIN:
+    for mode, isFilterNeeded, cmdLine, parser in cfg.DECODER_CHAIN:
         print "Process mode: ", mode, isFilterNeeded
         fullCmdLine = cmdLine + [waveName]
         print "fullCmdLine=", fullCmdLine
@@ -115,30 +97,37 @@ def decoder_proc(waveName, utcTime, outFormattedName):
             print "errdata=", errdata
         print "OutData=", outdata
 
-        if num_result_lines(outdata):
+        validLineFound = False
+        for line in StringIO.StringIO(outdata):
+            params = parser(line)
+            if not params['is_valid']:
+                continue
 
-            if cfg.KEEP_DECODED_RESULT:
-                suffix = "{0}{1}".format(mode, "1" if isFilterNeeded else "0")
-                with open(outFormattedName.format(suffix), "w") as fv:
-                    fv.write(outdata)
-            
-            for line in StringIO.StringIO(outdata):
-                lArr, rArr = split_params(line)
-                if rArr:
-                    if len(lArr) == 4:
-                        utcPrintableTime, dbRatio, dtShift, freq = lArr
-                    elif len(lArr) == 3:
-                        dbRatio, dtShift, freq = lArr
-                        utcPrintableTime = utcTime.strftime("%H%M%S")
-                    else:
-                        raise Exception("Unknown left side of params")
+            # check for empty message
+            if not params['message'].strip():
+                continue
 
-                    if not isFilterNeeded or is_valid_callsign_in_array(rArr):
-                        message = " ".join(rArr)
-                        itemToSend = (mode, utcPrintableTime, dbRatio, dtShift, freq, message)
-                        prepareToSend.append(itemToSend)
-        else:
-            print "No data present. Skip saving result."
+            validLineFound = True
+            if 'utc_time' in params:
+                utcPrintableTime = params['utc_time']
+            else:
+                utcPrintableTime = utcTime.strftime("%H%M%S") if mode.startswith("msk") else utcTime.strftime("%H%M")
+
+            itemToSend = (mode, utcPrintableTime, params['snr'].strip(), params['drift'].strip(), params['freq'].strip(), params['message'].strip())
+
+            if not isFilterNeeded or is_valid_callsign_in_array(params['message'].split()):
+                prepareToSend.append(itemToSend)
+
+        if validLineFound and cfg.KEEP_DECODED_RESULT:
+            for suffix in ["", "-1", "-2", "-3", "-4", "-5", "-6"]:
+                fname = "{}-{}{}.txt".format(outBaseName, mode, suffix)
+                if fname not in occupiedFileNames:
+                    break
+
+            occupiedFileNames[fname] = 1
+            with open(fname, "w") as fv:
+                fv.write(outdata)
+
 
     # remove duplicates
     newPrepareToSend = [elm for n,elm in enumerate(prepareToSend) if elm not in prepareToSend[:n]]
@@ -201,7 +190,6 @@ def main():
         baseName = cfg.BASE_FILE_NAME(dirName, dStart, utcTime)
         rawName = baseName + ".raw"
         waveName = baseName + ".wav"
-        outFormattedBaseName = baseName + "-{0}.txt"
 
         fv = open(rawName, "wb")
         print "Start write to {0}".format(rawName)
@@ -251,7 +239,7 @@ def main():
         os.remove(rawName) # delete raw file
         print "waveName=", waveName
 
-        t1 = threading.Thread(target=decoder_proc, args=(waveName, utcTime, outFormattedBaseName))
+        t1 = threading.Thread(target=decoder_proc, args=(waveName, utcTime, baseName))
         t1.start()
 
 

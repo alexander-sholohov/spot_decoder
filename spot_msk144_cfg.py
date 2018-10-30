@@ -1,5 +1,5 @@
 
-CSDR_CMD = 'csdr'
+CSDR_CMD = './csdr'
 MSK144_CMD = './msk144d2'
 FLAC_CMD = 'flac'
 
@@ -37,9 +37,10 @@ CMD_CHAIN.append( [CSDR_CMD, 'convert_f_i16'] )
 for item in CMD_CHAIN:
     print item
 
+msk144_parser = lambda x: {'snr':x[7:11], 'drift':x[11:16], 'freq':x[16:21], 'message':x[25:47], 'is_valid':(x[21:25] == ' &  ' or x[21:25] == ' ^  ')}
 
 DECODER_CHAIN = []
-DECODER_CHAIN.append( ['msk144', False, [MSK144_CMD, '-f', '1500'] ] )
+DECODER_CHAIN.append( ['msk144', False, [MSK144_CMD, '-f', '1500'], msk144_parser ] )
 
 CALLSIGN_PREFIXES = ["R9", "RA9", "UB9", "UB0", "RV9", "RZ9", "RK9", "R0",
                 "RA0", "UA9", "RU9", "RT9", "RT0", "RW9", "RW0", "UN7",
